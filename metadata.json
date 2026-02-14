@@ -1,0 +1,8 @@
+{
+  "name": "SmartWarranty",
+  "description": "A comprehensive digital warranty management system featuring OCR product registration, expiration tracking, and service center location services.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
