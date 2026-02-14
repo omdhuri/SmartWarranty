@@ -1,14 +1,33 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Product, getWarrantyStatus } from '../types';
-import { Calendar, AlertTriangle, CheckCircle, Clock, MoreVertical } from 'lucide-react';
+import { Calendar, AlertTriangle, CheckCircle, Clock, MoreVertical, Pencil, Archive, Trash2 } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
+  onEdit?: (product: Product) => void;
+  onDelete?: (product: Product) => void;
+  onArchive?: (product: Product) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onEdit, onDelete, onArchive }) => {
   const { status, daysRemaining, color, bgColor } = getWarrantyStatus(product);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [dropdownOpen]);
 
   // Icon selection based on status
   let Icon = CheckCircle;
@@ -33,14 +52,62 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/400/300?grayscale' }}
         />
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2" ref={dropdownRef}>
           <button
             className="p-1.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white text-slate-600 transition-all duration-150 hover:shadow-md focus:ring-2 focus:ring-cta outline-none"
-            onClick={(e) => { e.stopPropagation(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDropdownOpen(!dropdownOpen);
+            }}
             aria-label="More options"
           >
             <MoreVertical size={16} />
           </button>
+
+          {/* Dropdown Menu */}
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border border-slate-100 py-1 z-10 animate-in fade-in duration-200">
+              {onEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDropdownOpen(false);
+                    onEdit(product);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                >
+                  <Pencil size={14} />
+                  Edit
+                </button>
+              )}
+              {onArchive && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDropdownOpen(false);
+                    onArchive(product);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                >
+                  <Archive size={14} />
+                  Archive
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDropdownOpen(false);
+                    onDelete(product);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

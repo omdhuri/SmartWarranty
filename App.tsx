@@ -14,6 +14,7 @@ const App: React.FC = () => {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     // Initial load of notifications
     useEffect(() => {
@@ -44,11 +45,58 @@ const App: React.FC = () => {
                 'success'
             );
 
-            // Refresh dashboard and notifications
+            // Reload dashboard and notifications
             setRefreshKey(prev => prev + 1);
             loadNotifications();
+            setIsModalOpen(false);
+            setEditingProduct(null);
         } catch (error) {
             console.error('Error creating notification:', error);
+        }
+    };
+
+    const handleEditProduct = (product: Product) => {
+        setEditingProduct(product);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteProduct = async (product: Product) => {
+        if (window.confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
+            try {
+                const { deleteProduct } = await import('./services/productService');
+                await deleteProduct(product.id);
+
+                await createNotification(
+                    'Product Deleted',
+                    `${product.name} has been removed from your locker.`,
+                    'info'
+                );
+
+                setRefreshKey(prev => prev + 1);
+                loadNotifications();
+            } catch (error) {
+                console.error('Error deleting product:', error);
+            }
+        }
+    };
+
+    const handleArchiveProduct = async (product: Product) => {
+        if (window.confirm(`Archive "${product.name}"? You can view archived products later.`)) {
+            try {
+                const { deleteProduct } = await import('./services/productService');
+                await deleteProduct(product.id); // Uses same soft-delete logic
+
+                await createNotification(
+                    'Product Archived',
+                    `${product.name} has been archived.`,
+                    'info'
+                );
+
+                setRefreshKey(prev => prev + 1);
+                loadNotifications();
+            } catch (error) {
+                console.error('Error archiving product:', error);
+            }
         }
     };
 
@@ -109,6 +157,9 @@ const App: React.FC = () => {
                         key={refreshKey}
                         onAddProduct={() => setIsModalOpen(true)}
                         onViewProduct={(p) => console.log('View product', p)}
+                        onEditProduct={handleEditProduct}
+                        onDeleteProduct={handleDeleteProduct}
+                        onArchiveProduct={handleArchiveProduct}
                     />
                 ) : currentView === 'claims' ? (
                     <ClaimsList />
@@ -119,8 +170,12 @@ const App: React.FC = () => {
 
             <AddProductModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingProduct(null);
+                }}
                 onSave={handleProductAdded}
+                product={editingProduct}
             />
         </div>
     );

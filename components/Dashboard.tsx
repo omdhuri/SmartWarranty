@@ -8,9 +8,12 @@ import { Search, Filter, Plus, Loader2, AlertCircle } from 'lucide-react';
 interface DashboardProps {
   onAddProduct: () => void;
   onViewProduct: (product: Product) => void;
+  onEditProduct?: (product: Product) => void;
+  onDeleteProduct?: (product: Product) => void;
+  onArchiveProduct?: (product: Product) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct }) => {
+const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct, onEditProduct, onDeleteProduct, onArchiveProduct }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,7 +208,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct }) =>
               style={{ animationDelay: `${index * 100}ms` }}
               className="animate-in fade-in slide-in-from-bottom-4 duration-300"
             >
-              <ProductCard product={product} onClick={onViewProduct} />
+              <ProductCard
+                product={product}
+                onClick={onViewProduct}
+                onEdit={onEditProduct}
+                onDelete={onDeleteProduct}
+                onArchive={onArchiveProduct}
+              />
             </div>
           ))}
         </div>

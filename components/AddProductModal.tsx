@@ -3,7 +3,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Camera, Upload, X, Loader2, Save, Check, FileText, Smartphone, ShieldCheck, RefreshCw } from 'lucide-react';
 import { Product, OcrResult } from '../types';
 import { analyzeProductImage } from '../services/geminiService';
-import { createProduct, uploadProductImage } from '../services/productService';
+import { createProduct, uploadProductImage, updateProduct } from '../services/productService';
 import { CATEGORIES } from '../constants';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -11,10 +11,12 @@ interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (product: Product) => void;
+  product?: Product | null;
 }
 
-const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSave }) => {
-  const [mode, setMode] = useState<'scan' | 'manual'>('scan');
+const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSave, product }) => {
+  const isEditMode = !!product;
+  const [mode, setMode] = useState<'scan' | 'manual'>(isEditMode ? 'manual' : 'scan');
   const [showCamera, setShowCamera] = useState(false); // Camera toggle state
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -96,17 +98,56 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSa
     }
   };
 
-  // Form State
-  const [formData, setFormData] = useState<Partial<Product>>({
-    name: '',
-    brand: '',
-    modelNumber: '',
-    purchaseDate: new Date().toISOString().split('T')[0],
-    warrantyDurationMonths: 12,
-    category: 'electronics',
-    price: 0,
-    notes: ''
+  // Form State - pre-filled if editing
+  const [formData, setFormData] = useState<Partial<Product>>(() => {
+    if (product) {
+      return {
+        name: product.name || '',
+        brand: product.brand || '',
+        modelNumber: product.modelNumber || '',
+        purchaseDate: product.purchaseDate || new Date().toISOString().split('T')[0],
+        warrantyDurationMonths: product.warrantyDurationMonths || 12,
+        category: product.category || 'electronics',
+        price: product.price || 0,
+        notes: product.notes || ''
+      };
+    }
+    return {
+      name: '',
+      brand: '',
+      modelNumber: '',
+      purchaseDate: new Date().toISOString().split('T')[0],
+      warrantyDurationMonths: 12,
+      category: 'electronics',
+      price: 0,
+      notes: ''
+    };
   });
+
+  // Pre-fill image when editing
+  React.useEffect(() => {
+    if (product?.imageUrl || product?.product_image_url) {
+      setImagePreview(product.imageUrl || product.product_image_url || null);
+    } else if (!product) {
+      setImagePreview(null);
+    }
+  }, [product]);
+
+  // Update form data when product changes (for edit mode)
+  React.useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name || '',
+        brand: product.brand || '',
+        modelNumber: product.modelNumber || '',
+        purchaseDate: product.purchaseDate || new Date().toISOString().split('T')[0],
+        warrantyDurationMonths: product.warrantyDurationMonths || 12,
+        category: product.category || 'electronics',
+        price: product.price || 0,
+        notes: product.notes || ''
+      });
+    }
+  }, [product]);
 
   const processImage = async (imageSrc: string) => {
     setImagePreview(imageSrc); // Show preview immediately
@@ -166,14 +207,21 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSa
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
 
-      const productToSave: Partial<Product> = {
+      const productData: Partial<Product> = {
         ...formData,
         imageUrl: imageUrl || undefined,
         warrantyDurationMonths: Number(formData.warrantyDurationMonths),
         price: Number(formData.price)
       };
 
-      const savedProduct = await createProduct(productToSave);
+      let savedProduct;
+      if (isEditMode && product) {
+        // Update existing product
+        savedProduct = await updateProduct(product.id, productData);
+      } else {
+        // Create new product
+        savedProduct = await createProduct(productData);
+      }
 
       if (savedProduct) {
         setShowSuccess(true); // Trigger Success Animation
