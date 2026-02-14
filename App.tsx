@@ -3,12 +3,13 @@ import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import ServiceFinder from './components/ServiceFinder';
 import AddProductModal from './components/AddProductModal';
+import ClaimsList from './components/ClaimsList'; // Added import for ClaimsList
 import { Product, NotificationItem } from './types';
 import { INITIAL_NOTIFICATIONS } from './constants';
 import { X, Bell } from 'lucide-react';
 
 const App: React.FC = () => {
-    const [currentView, setCurrentView] = useState<'dashboard' | 'services'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'services' | 'claims'>('dashboard'); // Updated View state type
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
@@ -59,13 +60,19 @@ const App: React.FC = () => {
                 <div className="flex space-x-6 mb-8 border-b border-slate-200 pb-1">
                     <button
                         onClick={() => setCurrentView('dashboard')}
-                        className={`pb-3 px-1 text-sm font-semibold transition-all border-b-2 ${currentView === 'dashboard' ? 'border-cta text-cta' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        className={`pb-3 px-3 text-sm font-semibold transition-all border-b-2 ${currentView === 'dashboard' ? 'border-cta text-cta' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
                         Digital Locker
                     </button>
                     <button
+                        onClick={() => setCurrentView('claims')}
+                        className={`pb-3 px-3 text-sm font-semibold transition-all border-b-2 ${currentView === 'claims' ? 'border-cta text-cta' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Claims
+                    </button>
+                    <button
                         onClick={() => setCurrentView('services')}
-                        className={`pb-3 px-1 text-sm font-semibold transition-all border-b-2 ${currentView === 'services' ? 'border-cta text-cta' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        className={`pb-3 px-3 text-sm font-semibold transition-all border-b-2 ${currentView === 'services' ? 'border-cta text-cta' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
                         Service Network
                     </button>
@@ -77,6 +84,8 @@ const App: React.FC = () => {
                         onAddProduct={() => setIsModalOpen(true)}
                         onViewProduct={(p) => console.log('View product', p)}
                     />
+                ) : currentView === 'claims' ? (
+                    <ClaimsList />
                 ) : (
                     <ServiceFinder />
                 )}
