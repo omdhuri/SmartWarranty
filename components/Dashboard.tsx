@@ -93,8 +93,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct }) =>
           <h3 className="font-heading font-semibold text-primary">Warranty Status</h3>
           {chartData.length > 0 ? (
             <>
-              <div className="h-32 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ width: '100%', height: '200px', minHeight: '200px' }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <PieChart>
                     <Pie
                       data={chartData}

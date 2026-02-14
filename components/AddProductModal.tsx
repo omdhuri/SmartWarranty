@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { Camera, Upload, X, Loader2, Save, Check, FileText, Smartphone, ShieldCheck } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+// import Webcam from 'react-webcam'; // Removed
+import { Camera, Upload, X, Loader2, Save, Check, FileText, Smartphone, ShieldCheck, RefreshCw } from 'lucide-react';
 import { Product, OcrResult } from '../types';
 import { analyzeProductImage } from '../services/geminiService';
 import { createProduct, uploadProductImage } from '../services/productService';
@@ -14,12 +15,86 @@ interface AddProductModalProps {
 
 const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSave }) => {
   const [mode, setMode] = useState<'scan' | 'manual'>('scan');
+  const [showCamera, setShowCamera] = useState(false); // Camera toggle state
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false); // New Success State
+  const [showSuccess, setShowSuccess] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+
+  const startCamera = async () => {
+    setShowCamera(true);
+    // Request permission immediately
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      setStream(mediaStream);
+    } catch (err: any) {
+      console.error("Error accessing camera:", err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        alert("Camera access was denied. Please check your browser permissions (click the lock icon in the URL bar) and try again.");
+      } else {
+        alert("Could not access camera. Please upload an image instead.");
+      }
+      setShowCamera(false);
+    }
+  };
+
+  // Attach stream to video element when stream or videoRef changes
+  React.useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, showCamera]);
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const ioCapture = () => {
+    console.log("Attempting capture...");
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      if (video.readyState === 4) { // HAVE_ENOUGH_DATA
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context = canvas.getContext('2d');
+        if (context) {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageSrc = canvas.toDataURL('image/jpeg');
+          console.log("Capture successful, length:", imageSrc.length);
+          setImagePreview(imageSrc);
+
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
+              setImageFile(file);
+            }
+          }, 'image/jpeg');
+
+          stopCamera();
+          setMode('manual');
+        }
+      } else {
+        console.warn("Video not ready for capture. ReadyState:", video.readyState);
+      }
+    } else {
+      console.error("Refs missing. Video:", videoRef.current, "Canvas:", canvasRef.current);
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState<Partial<Product>>({
@@ -33,6 +108,35 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSa
     notes: ''
   });
 
+  const processImage = async (imageSrc: string) => {
+    setImagePreview(imageSrc); // Show preview immediately
+
+    if (mode === 'scan') {
+      setIsAnalyzing(true);
+      try {
+        console.log("Starting AI Analysis...");
+        const result = await analyzeProductImage(imageSrc);
+        console.log("AI Result:", result);
+
+        setFormData(prev => ({
+          ...prev,
+          name: result.productName || prev.name,
+          brand: result.brand || prev.brand,
+          modelNumber: result.modelNumber || prev.modelNumber,
+          purchaseDate: result.purchaseDate || prev.purchaseDate,
+          warrantyDurationMonths: result.warrantyDuration || prev.warrantyDurationMonths
+        }));
+
+      } catch (err) {
+        console.error("Analysis failed:", err);
+        // Optional: Show a toast error
+      } finally {
+        setIsAnalyzing(false);
+        setMode('manual');
+      }
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -41,25 +145,12 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSa
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64String = reader.result as string;
-      setImagePreview(base64String);
-
-      if (mode === 'scan') {
-        setIsAnalyzing(true);
-        try {
-          // Placeholder for OCR
-          console.log("OCR Placeholder: Image selected");
-          // await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate delay
-        } catch (err) {
-          console.error("Analysis failed", err);
-        } finally {
-          setIsAnalyzing(false);
-          setMode('manual');
-        }
-      }
+      await processImage(base64String);
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
 
   const handleSave = async () => {
     if (!formData.name || !formData.purchaseDate) {
@@ -226,28 +317,80 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSa
               </div>
 
               {mode === 'scan' ? (
-                <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group"
-                  onClick={() => fileInputRef.current?.click()}>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                  />
-                  {isAnalyzing ? (
-                    <div className="text-center">
-                      <Loader2 size={48} className="text-cta animate-spin mb-4 mx-auto" />
-                      <p className="text-slate-600 font-medium">Analyzing with AI...</p>
+                <div className="flex flex-col items-center justify-center min-h-[300px] border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors relative overflow-hidden">
+
+                  {showCamera ? (
+                    <div className="w-full h-full flex flex-col items-center relative bg-black">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+                      <canvas ref={canvasRef} className="hidden" />
+
+                      {/* Camera Controls */}
+                      <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center space-x-4">
+                        <button
+                          onClick={stopCamera}
+                          className="p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/40 transition-colors"
+                        >
+                          <X size={24} />
+                        </button>
+                        <button
+                          onClick={ioCapture}
+                          className="p-1 border-4 border-white rounded-full bg-transparent hover:bg-white/20 transition-all"
+                        >
+                          <div className="w-12 h-12 bg-white rounded-full"></div>
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center group-hover:scale-105 transition-transform duration-200">
-                      <div className="bg-white p-4 rounded-full shadow-sm inline-block mb-4">
-                        <Camera size={32} className="text-cta" />
-                      </div>
-                      <p className="text-slate-900 font-semibold mb-1">Click to upload or take photo</p>
-                      <p className="text-sm text-slate-500">Supports JPG, PNG (Max 5MB)</p>
-                    </div>
+                    <>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                      />
+
+                      {/* Click area for file upload */}
+                      <div
+                        className="absolute inset-0 z-0 cursor-pointer"
+                        onClick={() => fileInputRef.current?.click()}
+                      />
+
+                      {isAnalyzing ? (
+                        <div className="text-center z-10 relative pointer-events-none">
+                          <Loader2 size={48} className="text-cta animate-spin mb-4 mx-auto" />
+                          <p className="text-slate-600 font-medium">Analyzing with AI...</p>
+                        </div>
+                      ) : (
+                        <div className="text-center z-10 relative pointer-events-none">
+                          <div className="bg-white p-4 rounded-full shadow-sm inline-block mb-4">
+                            <Camera size={32} className="text-cta" />
+                          </div>
+                          <p className="text-slate-900 font-semibold mb-1">Upload an image</p>
+                          <p className="text-sm text-slate-500 mb-4">Supports JPG, PNG (Max 5MB)</p>
+
+                          <div className="flex items-center justify-center space-x-2">
+                            <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">OR</span>
+                          </div>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent file input trigger
+                              startCamera();
+                            }}
+                            className="mt-4 px-4 py-2 bg-white border border-slate-300 rounded-full text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-cta transition-colors shadow-sm flex items-center pointer-events-auto mx-auto"
+                          >
+                            <Camera size={16} className="mr-2" />
+                            Open Camera
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
