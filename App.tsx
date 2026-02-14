@@ -5,6 +5,7 @@ import ServiceFinder from './components/ServiceFinder';
 import AddProductModal from './components/AddProductModal';
 import ClaimsList from './components/ClaimsList';
 import NotificationPanel from './components/NotificationPanel';
+import ProductDetailModal from './components/ProductDetailModal';
 import { Product, NotificationItem } from './types';
 import { getNotifications, markAsRead, markAllAsRead, createNotification } from './services/notificationService';
 
@@ -12,9 +13,11 @@ const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<'dashboard' | 'services' | 'claims'>('dashboard');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [refreshKey, setRefreshKey] = useState(0);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
     // Initial load of notifications
     useEffect(() => {
@@ -156,7 +159,10 @@ const App: React.FC = () => {
                     <Dashboard
                         key={refreshKey}
                         onAddProduct={() => setIsModalOpen(true)}
-                        onViewProduct={(p) => console.log('View product', p)}
+                        onViewProduct={(p) => {
+                            setSelectedProduct(p);
+                            setIsDetailModalOpen(true);
+                        }}
                         onEditProduct={handleEditProduct}
                         onDeleteProduct={handleDeleteProduct}
                         onArchiveProduct={handleArchiveProduct}
@@ -177,6 +183,21 @@ const App: React.FC = () => {
                 onSave={handleProductAdded}
                 product={editingProduct}
             />
+
+            {/* Product Detail Modal */}
+            {selectedProduct && (
+                <ProductDetailModal
+                    product={selectedProduct}
+                    isOpen={isDetailModalOpen}
+                    onClose={() => {
+                        setIsDetailModalOpen(false);
+                        setSelectedProduct(null);
+                    }}
+                    onEdit={handleEditProduct}
+                    onDelete={handleDeleteProduct}
+                    onArchive={handleArchiveProduct}
+                />
+            )}
         </div>
     );
 };

@@ -537,6 +537,20 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSa
                       </select>
                     </div>
                   </div>
+
+                  {/* Price */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Price (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cta outline-none"
+                      value={formData.price || ''}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value ? Number(e.target.value) : 0 })}
+                      placeholder="e.g. 1299.99"
+                    />
+                  </div>
                 </div>
               )}
             </div>
