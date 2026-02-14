@@ -31,7 +31,8 @@ export const analyzeProductImage = async (base64Image: string): Promise<OcrResul
 
     // Helper to try models in sequence
     const generateWithFallback = async (cleanBase64: string) => {
-      const modelsToTry = ['gemini-2.0-flash-001', 'gemini-2.5-flash-001', 'gemini-flash-latest'];
+      // Prioritizing 'gemini-flash-latest' as it currently works best for this account
+      const modelsToTry = ['gemini-flash-latest', 'gemini-2.0-flash-001'];
 
       for (const model of modelsToTry) {
         try {

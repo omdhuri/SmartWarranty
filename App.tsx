@@ -1,58 +1,84 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import ServiceFinder from './components/ServiceFinder';
 import AddProductModal from './components/AddProductModal';
-import ClaimsList from './components/ClaimsList'; // Added import for ClaimsList
+import ClaimsList from './components/ClaimsList';
+import NotificationPanel from './components/NotificationPanel';
 import { Product, NotificationItem } from './types';
-import { INITIAL_NOTIFICATIONS } from './constants';
-import { X, Bell } from 'lucide-react';
+import { getNotifications, markAsRead, markAllAsRead, createNotification } from './services/notificationService';
 
 const App: React.FC = () => {
-    const [currentView, setCurrentView] = useState<'dashboard' | 'services' | 'claims'>('dashboard'); // Updated View state type
+    const [currentView, setCurrentView] = useState<'dashboard' | 'services' | 'claims'>('dashboard');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-    const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-    const [refreshKey, setRefreshKey] = useState(0); // Key to force dashboard refresh
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [refreshKey, setRefreshKey] = useState(0);
 
-    const NotificationDrawer = () => (
-        <div className={`fixed inset-y-0 right-0 w-80 bg-white shadow-2xl transform transition-transform duration-300 z-[60] ${isNotificationOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 className="font-heading font-bold text-primary flex items-center">
-                    <Bell size={18} className="mr-2" /> Notifications
-                </h3>
-                <button onClick={() => setIsNotificationOpen(false)} className="text-slate-400 hover:text-slate-600">
-                    <X size={20} />
-                </button>
-            </div>
-            <div className="overflow-y-auto h-full p-4 space-y-4">
-                {notifications.map(n => (
-                    <div key={n.id} className={`p-3 rounded-lg border ${n.type === 'warning' ? 'bg-amber-50 border-amber-100' : 'bg-white border-slate-100'} shadow-sm`}>
-                        <p className="text-sm font-semibold text-primary mb-1">{n.title}</p>
-                        <p className="text-xs text-slate-500 mb-2">{n.message}</p>
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wide">{new Date(n.date).toLocaleDateString()}</span>
-                    </div>
-                ))}
-                {notifications.length === 0 && <p className="text-center text-slate-400 text-sm py-4">No new notifications</p>}
-            </div>
-        </div>
-    );
+    // Initial load of notifications
+    useEffect(() => {
+        loadNotifications();
+    }, []);
+
+    const loadNotifications = async () => {
+        const data = await getNotifications();
+        setNotifications(data);
+    };
+
+    const handleMarkAsRead = async (id: string) => {
+        await markAsRead(id);
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    };
+
+    const handleMarkAllAsRead = async () => {
+        await markAllAsRead();
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    };
+
+    const handleProductAdded = async (newProduct: Product) => {
+        try {
+            // Create notification in DB
+            await createNotification(
+                'Product Added',
+                `${newProduct.name} has been secured in your locker.`,
+                'success'
+            );
+
+            // Refresh dashboard and notifications
+            setRefreshKey(prev => prev + 1);
+            loadNotifications();
+        } catch (error) {
+            console.error('Error creating notification:', error);
+        }
+    };
 
     return (
-        <div className="min-h-screen bg-background text-text font-sans">
+        <div className="min-h-screen bg-background text-text font-sans relative">
             <Navbar
-                onOpenNotifications={() => setIsNotificationOpen(true)}
-                notificationCount={notifications.filter(n => !n.read).length}
+                onOpenNotifications={() => setIsNotificationOpen(!isNotificationOpen)}
+                notificationCount={notifications.filter(n => !n.is_read).length}
             />
 
-            {/* Backdrop for notifications */}
+            {/* Notification Panel as a global overlay/dropdown from navbar */}
             {isNotificationOpen && (
-                <div
-                    className="fixed inset-0 bg-primary/20 backdrop-blur-sm z-50"
-                    onClick={() => setIsNotificationOpen(false)}
-                />
+                <div className="fixed inset-0 z-[60] flex justify-end">
+                    {/* Backdrop to close */}
+                    <div
+                        className="fixed inset-0 bg-black/10 z-[50]"
+                        onClick={() => setIsNotificationOpen(false)}
+                    />
+
+                    {/* The Panel itself - positioned relative to navbar or fixed right */}
+                    <div className="relative z-[60] mt-16 mr-4">
+                        <NotificationPanel
+                            notifications={notifications}
+                            onMarkAsRead={handleMarkAsRead}
+                            onMarkAllAsRead={handleMarkAllAsRead}
+                            onClose={() => setIsNotificationOpen(false)}
+                        />
+                    </div>
+                </div>
             )}
-            <NotificationDrawer />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
@@ -80,7 +106,7 @@ const App: React.FC = () => {
 
                 {currentView === 'dashboard' ? (
                     <Dashboard
-                        key={refreshKey} // Force re-mount to fetch new data
+                        key={refreshKey}
                         onAddProduct={() => setIsModalOpen(true)}
                         onViewProduct={(p) => console.log('View product', p)}
                     />
@@ -94,21 +120,7 @@ const App: React.FC = () => {
             <AddProductModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSave={(newProduct) => {
-                    // Refresh Dashboard
-                    setRefreshKey(prev => prev + 1);
-
-                    // Show notification
-                    const newNotif: NotificationItem = {
-                        id: Date.now().toString(),
-                        title: 'Product Added',
-                        message: `${newProduct.name} has been secured in your locker.`,
-                        date: new Date().toISOString(),
-                        type: 'info',
-                        read: false
-                    };
-                    setNotifications([newNotif, ...notifications]);
-                }}
+                onSave={handleProductAdded}
             />
         </div>
     );

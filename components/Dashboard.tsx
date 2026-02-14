@@ -17,6 +17,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+  // Fix for Recharts hydration/sizing issue
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Fetch products from Supabase
   useEffect(() => {
     loadProducts();
@@ -68,6 +74,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct }) =>
 
       {/* Top Section: Welcome & Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
         {/* Hero Card with gradient - UI.md: 60-30-10 rule, premium effects */}
         <div className="md:col-span-2 bg-gradient-to-br from-primary to-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
           <div className="relative z-10">
@@ -93,25 +100,31 @@ const Dashboard: React.FC<DashboardProps> = ({ onAddProduct, onViewProduct }) =>
           <h3 className="font-heading font-semibold text-primary">Warranty Status</h3>
           {chartData.length > 0 ? (
             <>
-              <div style={{ width: '100%', height: '200px', minHeight: '200px' }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={35}
-                      outerRadius={50}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div style={{ width: '100%', height: '200px', minHeight: '200px', position: 'relative' }}>
+                {mounted ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={50}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full w-full bg-slate-50 rounded-lg animate-pulse">
+                    <Loader2 className="animate-spin text-slate-300" size={24} />
+                  </div>
+                )}
               </div>
               <div className="flex justify-center space-x-4 text-sm">
                 <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-success mr-2"></div>Active</div>

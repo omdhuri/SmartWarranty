@@ -52,11 +52,12 @@ export interface ServiceCenter {
 
 export interface NotificationItem {
   id: string;
+  user_id: string;
   title: string;
   message: string;
-  date: string;
-  type: 'info' | 'warning' | 'urgent';
-  read: boolean;
+  type: 'info' | 'warning' | 'success' | 'error';
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface OcrResult {
