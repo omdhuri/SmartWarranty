@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
+import ProductLocker from './components/ProductLocker';
 import ServiceFinder from './components/ServiceFinder';
 import AddProductModal from './components/AddProductModal';
 import ClaimsList from './components/ClaimsList';
@@ -10,7 +11,7 @@ import { Product, NotificationItem } from './types';
 import { getNotifications, markAsRead, markAllAsRead, createNotification } from './services/notificationService';
 
 const App: React.FC = () => {
-    const [currentView, setCurrentView] = useState<'dashboard' | 'services' | 'claims'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'locker' | 'services' | 'claims'>('dashboard');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -108,6 +109,8 @@ const App: React.FC = () => {
             <Navbar
                 onOpenNotifications={() => setIsNotificationOpen(!isNotificationOpen)}
                 notificationCount={notifications.filter(n => !n.is_read).length}
+                currentView={currentView === 'claims' ? 'dashboard' : currentView}
+                onNavigate={(view) => setCurrentView(view)}
             />
 
             {/* Notification Panel as a global overlay/dropdown from navbar */}
@@ -155,9 +158,21 @@ const App: React.FC = () => {
                     </button>
                 </div>
 
+
                 {currentView === 'dashboard' ? (
                     <Dashboard
                         key={refreshKey}
+                        onAddProduct={() => setIsModalOpen(true)}
+                        onViewProduct={(p) => {
+                            setSelectedProduct(p);
+                            setIsDetailModalOpen(true);
+                        }}
+                        onEditProduct={handleEditProduct}
+                        onDeleteProduct={handleDeleteProduct}
+                        onArchiveProduct={handleArchiveProduct}
+                    />
+                ) : currentView === 'locker' ? (
+                    <ProductLocker
                         onAddProduct={() => setIsModalOpen(true)}
                         onViewProduct={(p) => {
                             setSelectedProduct(p);
